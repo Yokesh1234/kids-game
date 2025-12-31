@@ -37,6 +37,8 @@ export const ProfileSelector: React.FC<Props> = ({ onSelect }) => {
       <div className="mt-20 flex flex-col items-center gap-2 opacity-30 font-mono text-xs">
         <span>HAND_TRACKING_V2.5_ACTIVE</span>
         <span>DRIVERS_LOADED</span>
+        <span>YOKESH K</span>
+        <span>https://yokeshcv.netlify.app</span>
       </div>
     </div>
   );
