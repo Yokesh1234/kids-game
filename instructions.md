@@ -1,40 +1,53 @@
 
-# FunOS Gaming System
+# FunOS: Bootable Game OS Build Instructions
 
-This application is designed to be a dedicated "Game OS" for children aged 3-7. It creates an immersive, hardware-centric experience using webcam hand tracking and voice recognition.
+This guide explains how to pack the **Kids' Hand-Powered Fun Zone** into a standalone, bootable Linux ISO for x86_64 PCs.
 
-## 🚀 Native OS Installation (Kiosk Mode)
+## 1. Prerequisites
+- A Linux environment (Ubuntu 22.04 recommended).
+- **Cubic** (Custom Ubuntu ISO Creator).
+- Hardware: 4GB USB Drive.
 
-To turn a Raspberry Pi or Laptop into a dedicated **FunOS** console (Alternative to an ISO image):
+## 2. Prepare the App
+1. Build the production assets:
+   ```bash
+   npm install
+   npm run build
+   ```
+2. The `dist/` folder now contains the "Game OS" binary equivalent.
 
-1.  **Install Base OS**: Install a lightweight Linux distro (like Raspberry Pi OS Lite or Debian).
-2.  **Enable Auto-Login**: Configure the OS to log into a user account automatically.
-3.  **Install Chromium**: Ensure the Chromium browser is installed.
-4.  **Create a Kiosk Script**:
-    Create a script named `start-funos.sh`:
-    ```bash
-    #!/bin/bash
-    xset s off
-    xset -dpms
-    xset s noblank
-    chromium-browser --kiosk --noerrdialogs --disable-infobars --app=YOUR_DEPLOYED_URL_HERE
-    ```
-5.  **Set as Autostart**: Add this script to your `.xinitrc` or systemd service to launch on boot.
-6.  **Permission Bypass**: In Chrome, set `--use-fake-ui-for-media-stream` in the launch flags to automatically grant camera/mic permissions.
+## 3. Configure the OS Environment (using Cubic)
+Inside the Cubic Chroot environment, run:
 
-## ✋ Hand Gesture Logic
+### A. Install Dependencies
+```bash
+apt update
+apt install -y cage chromium-browser mesa-utils pulseaudio alsa-utils
+```
 
-*   **Open Hand**: Move your hand to control the "Magic Cursor".
-*   **Fist (Selection)**: Close your hand into a fist to "Click" elements.
-*   **Virtual Interface**: The cursor glows white and pulses when a selection is detected.
+### B. Setup User
+```bash
+useradd -m -s /bin/bash kid
+usermod -aG video,audio,input,render kid
+```
 
-## 🗣️ Voice Command System
+### C. Deploy Configs
+1. Copy `dist/` to `/opt/funos/dist/`.
+2. Move `os-config/funos.service` to `/etc/systemd/system/`.
+3. Move `os-config/start-funos.sh` to `/usr/local/bin/` and `chmod +x` it.
+4. Create directory `/etc/systemd/system/getty@tty1.service.d/` and move `os-config/99-kid-autologin.conf` into it as `override.conf`.
 
-*   The system uses high-quality TTS for a friendly guide voice.
-*   Recognition is performed locally in the browser for high privacy and speed.
+### D. Enable Kiosk
+```bash
+systemctl enable funos.service
+systemctl set-default multi-user.target
+```
 
-## 🎨 System Aesthetics
+## 4. Build and Flash
+- Generate the ISO in Cubic.
+- Flash to USB using **BalenaEtcher**.
+- Boot your PC, select the USB, and the system will jump directly into the "FUN_OS_INIT" boot sequence.
 
-*   **Dark Mode**: Reduced eye strain for young children.
-*   **Glassmorphism**: Modern, semi-transparent UI layers.
-*   **Hardware HUD**: Simulated CPU/Temp stats for that authentic "Geeky" Raspberry Pi feel.
+## 5. Deployment Fixes
+- **Node Version**: If building on Netlify/Cloudflare, ensure `engines` in `package.json` specifies Node 20.x to avoid Exit Code 2 errors.
+- **Webcam**: Ensure the target PC has a standard UVC webcam; drivers are included in the base Ubuntu kernel.

@@ -116,7 +116,8 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {mode !== GameMode.MENU && mode !== GameMode.TUTORIAL && mode !== GameMode.LOGIN && (
+      {/* Fix: removed redundant comparison with GameMode.LOGIN which is already filtered by early returns */}
+      {mode !== GameMode.MENU && mode !== GameMode.TUTORIAL && (
         <button
           id="back-btn"
           onClick={goToMenu}
