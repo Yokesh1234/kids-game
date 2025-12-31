@@ -1,0 +1,8 @@
+{
+  "name": "Kids' Hand-Powered Fun Zone",
+  "description": "An interactive game site for children aged 3–7 using webcam hand tracking and voice recognition for an immersive, mouse-free experience.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
