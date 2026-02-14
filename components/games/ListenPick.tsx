@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GAME_ITEMS, GameItem, HandData } from '../../types';
 import { speak } from '../../services/speechService';
 import { Confetti } from '../FeedbackEffects';
@@ -9,27 +9,52 @@ interface Props {
   handData: HandData;
 }
 
+interface FloatingItem extends GameItem {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+const STORAGE_KEY = 'funos_listen_pick_highscore';
+
 export const ListenPick: React.FC<Props> = ({ onBack, handData }) => {
-  const [options, setOptions] = useState<GameItem[]>([]);
+  const [options, setOptions] = useState<FloatingItem[]>([]);
   const [target, setTarget] = useState<GameItem | null>(null);
-  const [feedback, setFeedback] = useState<string>('');
   const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [isNewRecord, setIsNewRecord] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [wrongItem, setWrongItem] = useState<string | null>(null);
+  const requestRef = useRef<number>(null);
+
+  // Load high score on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      setHighScore(parseInt(saved, 10));
+    }
+  }, []);
 
   const startNewRound = useCallback(() => {
     const shuffled = [...GAME_ITEMS].sort(() => 0.5 - Math.random());
-    const roundOptions = shuffled.slice(0, 4);
-    const roundTarget = roundOptions[Math.floor(Math.random() * 4)];
+    const roundOptions = shuffled.slice(0, 4).map(item => ({
+      ...item,
+      id: Math.random().toString(),
+      x: Math.random() * 60 + 20,
+      y: Math.random() * 60 + 20,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+    }));
+    const roundTarget = roundOptions[Math.floor(Math.random() * roundOptions.length)];
     
     setOptions(roundOptions);
     setTarget(roundTarget);
-    setFeedback('');
     setShowConfetti(false);
-    setWrongItem(null);
+    setIsNewRecord(false);
     
     setTimeout(() => {
-      speak(`Find the ${roundTarget.name}`);
+      speak(`Pop the ${roundTarget.name}!`);
     }, 500);
   }, []);
 
@@ -37,83 +62,105 @@ export const ListenPick: React.FC<Props> = ({ onBack, handData }) => {
     startNewRound();
   }, [startNewRound]);
 
-  const handlePick = (item: GameItem) => {
-    if (item.name === target?.name) {
-      setFeedback('AWESOME! 🌟');
-      setScore(s => s + 1);
-      setShowConfetti(true);
-      speak(`Great job! That is the ${item.name}!`);
-      
-      const history = JSON.parse(localStorage.getItem('pickedItems') || '[]');
-      history.push(item.name);
-      localStorage.setItem('pickedItems', JSON.stringify(history));
+  // Animation Loop for floating bubbles
+  useEffect(() => {
+    const animate = () => {
+      setOptions(prev => prev.map(item => {
+        let nextX = item.x + item.vx;
+        let nextY = item.y + item.vy;
+        let nextVx = item.vx;
+        let nextVy = item.vy;
 
+        if (nextX < 10 || nextX > 90) nextVx *= -1;
+        if (nextY < 10 || nextY > 90) nextVy *= -1;
+
+        return { ...item, x: nextX, y: nextY, vx: nextVx, vy: nextVy };
+      }));
+      requestRef.current = requestAnimationFrame(animate);
+    };
+    requestRef.current = requestAnimationFrame(animate);
+    return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+  }, []);
+
+  const handlePick = (item: FloatingItem) => {
+    if (showConfetti) return;
+    
+    if (item.name === target?.name) {
+      const newScore = score + 1;
+      setScore(newScore);
+      
+      // Update High Score
+      if (newScore > highScore) {
+        setHighScore(newScore);
+        setIsNewRecord(true);
+        localStorage.setItem(STORAGE_KEY, newScore.toString());
+      }
+
+      setShowConfetti(true);
+      speak(`POP! You got the ${item.name}!`);
       setTimeout(startNewRound, 2500);
     } else {
-      setWrongItem(item.name);
-      setFeedback('Try again! You can do it! 💪');
-      speak(`Not quite, try again! Look for the ${target?.name}`);
-      setTimeout(() => setWrongItem(null), 1000);
+      speak(`That's the ${item.name}. Look for the ${target?.name}!`);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full p-8 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center h-full w-full relative overflow-hidden bg-gradient-to-b from-blue-900 to-indigo-950">
       <Confetti active={showConfetti} />
       
-      <div className="mb-8 text-center z-10">
-        <h2 className="text-6xl text-purple-600 mb-2 font-black drop-shadow-lg">Listen & Pick!</h2>
-        <div className="text-3xl text-gray-600 font-bold bg-white/80 px-8 py-2 rounded-full inline-block shadow-sm">
-          Stars Earned: {score} ⭐
+      {/* Scoreboard UI */}
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 z-10 text-center flex flex-col items-center">
+        <h2 className="text-4xl text-blue-200 font-black mb-1">BUBBLE POP!</h2>
+        
+        <div className="flex gap-8 items-center bg-black/30 backdrop-blur-xl px-6 py-2 rounded-full border border-white/10">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-blue-400 font-mono tracking-widest uppercase">Current Score</span>
+            <span className="text-2xl text-white font-black leading-none">{score.toString().padStart(3, '0')}</span>
+          </div>
+          
+          <div className="w-[1px] h-8 bg-white/10" />
+          
+          <div className="flex flex-col">
+            <span className="text-[10px] text-yellow-500 font-mono tracking-widest uppercase">Best Record</span>
+            <span className="text-2xl text-yellow-400 font-black leading-none">{highScore.toString().padStart(3, '0')}</span>
+          </div>
         </div>
-      </div>
 
-      <div className="h-24 flex items-center justify-center z-10">
-        {feedback && (
-          <div className={`text-7xl font-black animate-bounce ${feedback.includes('AWESOME') ? 'text-green-500' : 'text-orange-500'}`}>
-            {feedback}
+        {isNewRecord && (
+          <div className="mt-2 px-3 py-1 bg-yellow-400 text-black text-[10px] font-black rounded-full animate-bounce shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+            NEW_HIGH_SCORE_UNLOCKED!
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-8 max-w-4xl z-10">
-        {options.map((item) => {
-          const isCorrect = showConfetti && item.name === target?.name;
-          const isWrong = wrongItem === item.name;
-          
-          return (
-            <button
-              key={item.name}
-              onClick={() => !showConfetti && handlePick(item)}
-              className={`group bg-white p-6 rounded-[3rem] shadow-2xl border-8 transition-all transform duration-300 
-                ${isCorrect ? 'scale-110 border-green-400 rotate-3' : 'hover:scale-105 active:scale-90 border-white'}
-                ${isWrong ? 'animate-shake border-red-400' : ''}
-              `}
-            >
-              <img src={item.image} alt={item.name} className="w-64 h-64 object-cover rounded-3xl mb-4 pointer-events-none shadow-md" />
-              <div className="text-7xl group-hover:scale-110 transition-transform">{item.emoji}</div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-10 z-10">
+      {options.map((item) => (
         <button
-          onClick={() => target && speak(`Look for the ${target.name}`)}
-          className="bg-yellow-400 p-8 rounded-full text-4xl shadow-2xl border-4 border-white animate-pulse hover:bg-yellow-500 transition-colors"
+          key={item.id}
+          onClick={() => handlePick(item)}
+          style={{ left: `${item.x}%`, top: `${item.y}%` }}
+          className={`absolute w-48 h-48 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300
+            ${showConfetti && item.name === target?.name ? 'scale-150' : 'hover:scale-110'}
+          `}
         >
-          📢 REPEAT
+          {/* Bubble Visual */}
+          <div className="absolute inset-0 bg-white/10 backdrop-blur-md rounded-full border-4 border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.2)] animate-pulse" />
+          <div className="absolute inset-2 bg-gradient-to-tr from-transparent to-white/30 rounded-full" />
+          
+          <div className="relative flex flex-col items-center justify-center h-full pointer-events-none">
+            <span className="text-7xl mb-2">{item.emoji}</span>
+            <span className="text-white/40 font-mono text-[10px] uppercase tracking-tighter">{item.name}</span>
+          </div>
+        </button>
+      ))}
+
+      <div className="absolute bottom-10 flex gap-4">
+        <button
+          onClick={() => target && speak(`Find the ${target.name}`)}
+          className="px-8 py-3 bg-white/5 border border-white/10 rounded-full text-blue-300 font-mono text-xs hover:bg-white/10 transition-all flex items-center gap-2"
+        >
+          <span className="animate-pulse">🔊</span> RE-SEND_AUDIO_PROMPT
         </button>
       </div>
-
-      <style>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-10px); }
-          75% { transform: translateX(10px); }
-        }
-        .animate-shake { animation: shake 0.2s ease-in-out infinite; }
-      `}</style>
     </div>
   );
 };

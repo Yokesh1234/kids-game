@@ -9,8 +9,10 @@ import { ProfileSelector } from './components/ProfileSelector';
 import { ListenPick } from './components/games/ListenPick';
 import { ShowSay } from './components/games/ShowSay';
 import { ReadAloud } from './components/games/ReadAloud';
+import { StarCatcher } from './components/games/StarCatcher';
+import { NeonPainter } from './components/games/NeonPainter';
+import { LogicBlocks } from './components/games/LogicBlocks';
 import { SystemBar } from './components/SystemBar';
-import { speak } from './services/speechService';
 
 export const App: React.FC = () => {
   const [mode, setMode] = useState<GameMode>(GameMode.BOOT);
@@ -20,7 +22,6 @@ export const App: React.FC = () => {
   
   const lastFistState = useRef(false);
 
-  // OS Boot Animation Logic
   useEffect(() => {
     if (mode === GameMode.BOOT) {
       const interval = setInterval(() => {
@@ -37,7 +38,6 @@ export const App: React.FC = () => {
     }
   }, [mode]);
 
-  // Handle Hand Selection (Fist down/up logic)
   useEffect(() => {
     if (handData.isFist && !lastFistState.current) {
       const element = document.elementFromPoint(handData.x, handData.y) as HTMLElement;
@@ -47,10 +47,6 @@ export const App: React.FC = () => {
     }
     lastFistState.current = handData.isFist;
   }, [handData]);
-
-  const handleStartGame = (newMode: GameMode) => {
-    setMode(newMode);
-  };
 
   const goToMenu = useCallback(() => {
     setMode(GameMode.MENU);
@@ -67,10 +63,7 @@ export const App: React.FC = () => {
            <div>[ OK ] Neural Mesh Loaded</div>
         </div>
         <div className="w-96 h-1 bg-slate-900 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"
-            style={{ width: `${bootProgress}%` }}
-          />
+          <div className="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6]" style={{ width: `${bootProgress}%` }} />
         </div>
       </div>
     );
@@ -88,16 +81,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center bg-[#020617]">
-      {/* OS Grid Lines */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-      
       <SystemBar />
-
-      <HandTracker 
-        onData={setHandData} 
-        onReady={() => setIsCameraReady(true)} 
-      />
-
+      <HandTracker onData={setHandData} onReady={() => setIsCameraReady(true)} />
       <Cursor handData={handData} />
 
       {!isCameraReady ? (
@@ -108,15 +94,17 @@ export const App: React.FC = () => {
         </div>
       ) : (
         <div className="w-full h-full flex flex-col pt-10">
-          {mode === GameMode.MENU && <MainMenu onSelect={handleStartGame} />}
-          {mode === GameMode.TUTORIAL && <Tutorial onComplete={() => setMode(GameMode.MENU)} />}
+          {mode === GameMode.MENU && <MainMenu onSelect={(m) => setMode(m)} />}
+          {mode === GameMode.TUTORIAL && <Tutorial onComplete={goToMenu} />}
           {mode === GameMode.LISTEN_PICK && <ListenPick onBack={goToMenu} handData={handData} />}
           {mode === GameMode.SHOW_SAY && <ShowSay onBack={goToMenu} handData={handData} />}
           {mode === GameMode.READ_ALOUD && <ReadAloud onBack={goToMenu} handData={handData} />}
+          {mode === GameMode.STAR_CATCHER && <StarCatcher onBack={goToMenu} handData={handData} />}
+          {mode === GameMode.NEON_PAINTER && <NeonPainter onBack={goToMenu} handData={handData} />}
+          {mode === GameMode.LOGIC_BLOCKS && <LogicBlocks onBack={goToMenu} handData={handData} />}
         </div>
       )}
 
-      {/* Fix: removed redundant comparison with GameMode.LOGIN which is already filtered by early returns */}
       {mode !== GameMode.MENU && mode !== GameMode.TUTORIAL && (
         <button
           id="back-btn"
